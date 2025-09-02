@@ -46,6 +46,9 @@ _deps/
 INSTALLATION.md
 ORACLE_SETUP.md
 
+# Documentation directory
+docs/
+
 # Database files
 *.db
 *.sqlite

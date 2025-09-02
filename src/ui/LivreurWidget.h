@@ -106,9 +106,13 @@ public:
     explicit LivreurDialog(QWidget* parent = nullptr, const Livreur& livreur = Livreur());
     Livreur getLivreur() const;
 
+private slots:
+    void validerSaisie();
+
 private:
     void setupUI();
     void remplirFormulaire(const Livreur& livreur);
+    bool validerChamps();
     
     QFormLayout* formLayout;
     QLineEdit* editNom;

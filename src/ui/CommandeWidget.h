@@ -109,9 +109,13 @@ public:
     explicit CommandeDialog(QWidget* parent = nullptr, const Commande& commande = Commande());
     Commande getCommande() const;
 
+private slots:
+    void validerSaisie();
+
 private:
     void setupUI();
     void remplirFormulaire(const Commande& commande);
+    bool validerChamps();
     
     QFormLayout* formLayout;
     QDateEdit* editDateCommande;

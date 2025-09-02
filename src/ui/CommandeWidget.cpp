@@ -11,6 +11,8 @@
 #include <QDialogButtonBox>
 #include <QInputDialog>
 #include <QApplication>
+#include <QRegularExpression>
+#include <QRegularExpressionValidator>
 
 // Implémentation de CommandeDialog
 CommandeDialog::CommandeDialog(QWidget* parent, const Commande& commande)
@@ -48,11 +50,16 @@ void CommandeDialog::setupUI()
     
     editVilleLivraison = new QLineEdit();
     editVilleLivraison->setPlaceholderText("Entrez la ville de livraison");
+    // Validation: Seulement lettres, espaces, tirets et apostrophes
+    QRegularExpression villeRegex("^[A-Za-zÀ-ÿ\\s\\-\\']{2,50}$");
+    editVilleLivraison->setValidator(new QRegularExpressionValidator(villeRegex, this));
+    editVilleLivraison->setMaxLength(50);
     formLayout->addRow("Ville de livraison:", editVilleLivraison);
     
     spinIdClient = new QSpinBox();
     spinIdClient->setRange(1, 999999);
     spinIdClient->setValue(1);
+    spinIdClient->setToolTip("ID client doit être entre 1 et 999999");
     formLayout->addRow("ID Client:", spinIdClient);
     
     comboLivreur = new QComboBox();
@@ -71,9 +78,49 @@ void CommandeDialog::setupUI()
     
     // Boutons
     buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
-    connect(buttonBox, &QDialogButtonBox::accepted, this, &QDialog::accept);
+    connect(buttonBox, &QDialogButtonBox::accepted, this, &CommandeDialog::validerSaisie);
     connect(buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
     mainLayout->addWidget(buttonBox);
+}
+
+void CommandeDialog::validerSaisie()
+{
+    if (validerChamps()) {
+        accept();
+    }
+}
+
+bool CommandeDialog::validerChamps()
+{
+    // Validation de la ville de livraison
+    if (editVilleLivraison->text().trimmed().isEmpty()) {
+        QMessageBox::warning(this, "Erreur de saisie", "La ville de livraison est obligatoire.");
+        editVilleLivraison->setFocus();
+        return false;
+    }
+    
+    // Validation de la longueur minimale de la ville
+    if (editVilleLivraison->text().trimmed().length() < 2) {
+        QMessageBox::warning(this, "Erreur de saisie", "La ville doit contenir au moins 2 caractères.");
+        editVilleLivraison->setFocus();
+        return false;
+    }
+    
+    // Validation de l'ID client
+    if (spinIdClient->value() <= 0) {
+        QMessageBox::warning(this, "Erreur de saisie", "L'ID client doit être supérieur à 0.");
+        spinIdClient->setFocus();
+        return false;
+    }
+    
+    // Validation du livreur sélectionné
+    if (comboLivreur->currentData().toInt() <= 0) {
+        QMessageBox::warning(this, "Erreur de saisie", "Veuillez sélectionner un livreur valide.");
+        comboLivreur->setFocus();
+        return false;
+    }
+    
+    return true;
 }
 
 void CommandeDialog::remplirFormulaire(const Commande& commande)

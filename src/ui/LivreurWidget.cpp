@@ -13,6 +13,8 @@
 #include <QInputDialog>
 #include <QChartView>
 #include <QBarSeries>
+#include <QRegularExpression>
+#include <QRegularExpressionValidator>
 #include <QBarSet>
 #include <QBarCategoryAxis>
 #include <QValueAxis>
@@ -44,6 +46,30 @@ void LivreurDialog::setupUI()
     editVehicule = new QLineEdit(this);
     checkDisponibilite = new QCheckBox(this);
     
+    // Validation pour le nom (lettres uniquement)
+    QRegularExpressionValidator* nomValidator = new QRegularExpressionValidator(
+        QRegularExpression("^[A-Za-zÀ-ÿ\\s]{2,50}$"), this);
+    editNom->setValidator(nomValidator);
+    editNom->setPlaceholderText("Ex: Aymen jallouli");
+    
+    // Validation pour le téléphone (format international ou local)
+    QRegularExpressionValidator* telValidator = new QRegularExpressionValidator(
+        QRegularExpression("^[+]?[0-9\\s\\-\\(\\)]{8,15}$"), this);
+    editTelephone->setValidator(telValidator);
+    editTelephone->setPlaceholderText("Ex: +216 22222222");
+    
+    // Validation pour la zone (lettres, chiffres, espaces)
+    QRegularExpressionValidator* zoneValidator = new QRegularExpressionValidator(
+        QRegularExpression("^[A-Za-zÀ-ÿ0-9\\s\\-]{2,100}$"), this);
+    editZone->setValidator(zoneValidator);
+    editZone->setPlaceholderText("Ex: Paris Centre");
+    
+    // Validation pour le véhicule
+    QRegularExpressionValidator* vehiculeValidator = new QRegularExpressionValidator(
+        QRegularExpression("^[A-Za-zÀ-ÿ0-9\\s\\-]{2,50}$"), this);
+    editVehicule->setValidator(vehiculeValidator);
+    editVehicule->setPlaceholderText("Ex: Scooter, Vélo, Camionnette");
+    
     formLayout->addRow("Nom:", editNom);
     formLayout->addRow("Téléphone:", editTelephone);
     formLayout->addRow("Zone de livraison:", editZone);
@@ -53,13 +79,77 @@ void LivreurDialog::setupUI()
     mainLayout->addLayout(formLayout);
     
     // Boutons
-    QDialogButtonBox* buttonBox = new QDialogButtonBox(
+    buttonBox = new QDialogButtonBox(
         QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
     
-    connect(buttonBox, &QDialogButtonBox::accepted, this, &QDialog::accept);
+    connect(buttonBox, &QDialogButtonBox::accepted, this, &LivreurDialog::validerSaisie);
     connect(buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
     
     mainLayout->addWidget(buttonBox);
+}
+
+void LivreurDialog::validerSaisie()
+{
+    if (validerChamps()) {
+        accept();
+    }
+}
+
+bool LivreurDialog::validerChamps()
+{
+    // Validation du nom
+    if (editNom->text().trimmed().isEmpty()) {
+        QMessageBox::warning(this, "Erreur de saisie", "Le nom est obligatoire.");
+        editNom->setFocus();
+        return false;
+    }
+    
+    if (editNom->text().trimmed().length() < 2) {
+        QMessageBox::warning(this, "Erreur de saisie", "Le nom doit contenir au moins 2 caractères.");
+        editNom->setFocus();
+        return false;
+    }
+    
+    // Validation du téléphone
+    if (editTelephone->text().trimmed().isEmpty()) {
+        QMessageBox::warning(this, "Erreur de saisie", "Le numéro de téléphone est obligatoire.");
+        editTelephone->setFocus();
+        return false;
+    }
+    
+    if (editTelephone->text().trimmed().length() < 8) {
+        QMessageBox::warning(this, "Erreur de saisie", "Le numéro de téléphone doit contenir au moins 8 chiffres.");
+        editTelephone->setFocus();
+        return false;
+    }
+    
+    // Validation de la zone de livraison
+    if (editZone->text().trimmed().isEmpty()) {
+        QMessageBox::warning(this, "Erreur de saisie", "La zone de livraison est obligatoire.");
+        editZone->setFocus();
+        return false;
+    }
+    
+    if (editZone->text().trimmed().length() < 2) {
+        QMessageBox::warning(this, "Erreur de saisie", "La zone de livraison doit contenir au moins 2 caractères.");
+        editZone->setFocus();
+        return false;
+    }
+    
+    // Validation du véhicule
+    if (editVehicule->text().trimmed().isEmpty()) {
+        QMessageBox::warning(this, "Erreur de saisie", "Le type de véhicule est obligatoire.");
+        editVehicule->setFocus();
+        return false;
+    }
+    
+    if (editVehicule->text().trimmed().length() < 2) {
+        QMessageBox::warning(this, "Erreur de saisie", "Le type de véhicule doit contenir au moins 2 caractères.");
+        editVehicule->setFocus();
+        return false;
+    }
+    
+    return true;
 }
 
 void LivreurDialog::remplirFormulaire(const Livreur& livreur)
