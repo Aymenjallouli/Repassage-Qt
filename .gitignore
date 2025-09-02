@@ -1,0 +1,69 @@
+# Build directories
+build/
+cmake-build-*/
+*build*
+
+# Qt specific
+*.pro.user
+*.pro.user.*
+*_qmlcache.qrc
+moc_*.cpp
+moc_*.h
+qrc_*.cpp
+ui_*.h
+
+# Compiler-specific
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Visual Studio / VS Code
+.vs/
+.vscode/
+*.vcxproj.user
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+_deps/
+
+# Oracle files
+*.oci
+*.odbc
+
+# Scripts and temporary files
+*.ps1
+*.bat
+*.tmp
+*.log
+
+# Documentation and setup files (keeping only essential ones)
+INSTALLATION.md
+ORACLE_SETUP.md
+
+# Database files
+*.db
+*.sqlite
+
+# Backup files
+*~
+*.bak
+*.orig
+
+# OS specific
+Thumbs.db
+.DS_Store
+*.swp
+*.swo
+
+# IDE specific
+*.user
+*.cbp
+*.layout
+*.depend
+*.workspace
