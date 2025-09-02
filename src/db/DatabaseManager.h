@@ -39,9 +39,14 @@ public:
     // Database initialization
     bool createTables();
     bool insertSampleData();
+    bool checkTablesExist();
+    void initializeDatabaseWithSampleData(); // Méthode pour initialiser avec des données si vide
+    void forceUpdateConstraints(); // Forcer la mise à jour des contraintes
     
 private:
     void showDatabaseError(const QString& error);
+    void createIndexes();
+    void updateForeignKeyConstraints();
 };
 
 #endif // DATABASEMANAGER_H

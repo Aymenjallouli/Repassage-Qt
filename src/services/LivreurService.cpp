@@ -84,12 +84,33 @@ bool LivreurService::supprimerLivreur(int id)
 {
     DatabaseManager* db = DatabaseManager::getInstance();
     
+    // D'abord, compter les commandes qui seront supprimées en cascade
+    int commandesASupprimer = compterToutesCommandes(id);
+    
+    // Informer l'utilisateur si des commandes seront supprimées
+    if (commandesASupprimer > 0) {
+        qDebug() << "ATTENTION: La suppression du livreur ID" << id 
+                 << "supprimera également" << commandesASupprimer 
+                 << "commande(s) associée(s) (CASCADE)";
+    }
+    
+    // Procéder à la suppression (CASCADE automatique grâce à la contrainte)
     QString query = "DELETE FROM LIVREURS WHERE id_livreur = ?";
     QVariantList values;
     values << id;
     
     QSqlQuery result = db->executePreparedQuery(query, values);
-    return !result.lastError().isValid();
+    
+    if (!result.lastError().isValid()) {
+        qDebug() << "Livreur supprimé avec succès (ID:" << id << ")";
+        if (commandesASupprimer > 0) {
+            qDebug() << "Commandes associées supprimées automatiquement:" << commandesASupprimer;
+        }
+        return true;
+    } else {
+        qDebug() << "Erreur suppression livreur:" << result.lastError().text();
+        return false;
+    }
 }
 
 QList<Livreur> LivreurService::rechercherLivreurs(const QString& nom, const QString& zone, bool disponibiliteSeule)
@@ -343,6 +364,24 @@ int LivreurService::compterCommandesActives(int idLivreur)
     
     QString query = "SELECT COUNT(*) as nombre FROM commandes "
                    "WHERE id_livreur = ? AND statut IN ('En attente', 'En cours')";
+    
+    QVariantList values;
+    values << idLivreur;
+    
+    QSqlQuery result = db->executePreparedQuery(query, values);
+    
+    if (result.next()) {
+        return result.value("nombre").toInt();
+    }
+    
+    return 0;
+}
+
+int LivreurService::compterToutesCommandes(int idLivreur)
+{
+    DatabaseManager* db = DatabaseManager::getInstance();
+    
+    QString query = "SELECT COUNT(*) as nombre FROM COMMANDES WHERE id_livreur = ?";
     
     QVariantList values;
     values << idLivreur;

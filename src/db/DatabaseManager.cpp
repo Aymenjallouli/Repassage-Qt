@@ -73,8 +73,13 @@ bool DatabaseManager::connectToDatabase()
 
     qDebug() << "Connexion à Oracle réussie !";
     
-    // Créer les tables avec la structure complète
-    createTables();
+    // Vérifier si les tables existent déjà et les créer seulement si nécessaire
+    if (!checkTablesExist()) {
+        qDebug() << "Tables non trouvées, création des tables...";
+        createTables();
+    } else {
+        qDebug() << "Tables existantes trouvées, connexion prête à l'utilisation.";
+    }
     
     return true;
 }
@@ -152,17 +157,8 @@ bool DatabaseManager::createTables()
 {
     qDebug() << "Début de la création des tables Oracle...";
     
-    // Supprimer les tables existantes
-    QStringList dropQueries = {
-        "DROP TABLE COMMANDES CASCADE CONSTRAINTS",
-        "DROP TABLE LIVREURS CASCADE CONSTRAINTS"
-    };
-    
-    for (const QString& dropQuery : dropQueries) {
-        QSqlQuery query(database);
-        query.exec(dropQuery);
-        qDebug() << "DROP:" << dropQuery << "Résultat:" << (query.lastError().isValid() ? query.lastError().text() : "OK");
-    }
+    // NE PAS supprimer les tables existantes - préserver les données
+    // Les tables seront créées seulement si elles n'existent pas
     
     // Créer la table LIVREURS avec TOUS les champs
     QString createLivreurs = R"(
@@ -179,12 +175,20 @@ bool DatabaseManager::createTables()
     )";
     
     QSqlQuery queryLivreurs(database);
-    qDebug() << "Exécution de:" << createLivreurs;
+    qDebug() << "Tentative de création table LIVREURS...";
     if (!queryLivreurs.exec(createLivreurs)) {
-        qDebug() << "Erreur création table LIVREURS:" << queryLivreurs.lastError().text();
-        return false;
+        // Si la table existe déjà, ce n'est pas une erreur
+        QString error = queryLivreurs.lastError().text();
+        if (error.contains("name is already used by an existing object") || 
+            error.contains("ORA-00955")) {
+            qDebug() << "Table LIVREURS existe déjà - OK";
+        } else {
+            qDebug() << "Erreur création table LIVREURS:" << error;
+            return false;
+        }
+    } else {
+        qDebug() << "Table LIVREURS créée avec succès";
     }
-    qDebug() << "Table créée avec succès";
     
     // Créer la table COMMANDES
     QString createCommandes = R"(
@@ -197,18 +201,58 @@ bool DatabaseManager::createTables()
             ID_LIVREUR NUMBER,
             CREATED_AT DATE DEFAULT SYSDATE,
             UPDATED_AT DATE DEFAULT SYSDATE,
-            CONSTRAINT FK_COMMANDES_LIVREUR FOREIGN KEY (ID_LIVREUR) REFERENCES LIVREURS(ID_LIVREUR)
+            CONSTRAINT FK_COMMANDES_LIVREUR FOREIGN KEY (ID_LIVREUR) REFERENCES LIVREURS(ID_LIVREUR) ON DELETE CASCADE
         )
     )";
     
     QSqlQuery queryCommandes(database);
-    qDebug() << "Exécution de:" << createCommandes;
+    qDebug() << "Tentative de création table COMMANDES...";
     if (!queryCommandes.exec(createCommandes)) {
-        qDebug() << "Erreur création table COMMANDES:" << queryCommandes.lastError().text();
+        // Si la table existe déjà, ce n'est pas une erreur
+        QString error = queryCommandes.lastError().text();
+        if (error.contains("name is already used by an existing object") || 
+            error.contains("ORA-00955")) {
+            qDebug() << "Table COMMANDES existe déjà - OK";
+        } else {
+            qDebug() << "Erreur création table COMMANDES:" << error;
+            return false;
+        }
+    } else {
+        qDebug() << "Table COMMANDES créée avec succès";
+    }
+    
+    // Créer des index (ils seront ignorés s'ils existent déjà)
+    createIndexes();
+    
+    // Mettre à jour les contraintes pour la suppression en cascade
+    updateForeignKeyConstraints();
+    
+    qDebug() << "Vérification/Création des tables terminée avec succès";
+    return true;
+}
+
+bool DatabaseManager::checkTablesExist()
+{
+    // Vérifier si les tables principales existent
+    QSqlQuery query(database);
+    query.prepare("SELECT COUNT(*) FROM USER_TABLES WHERE TABLE_NAME IN ('LIVREURS', 'COMMANDES')");
+    
+    if (!query.exec()) {
+        qDebug() << "Erreur lors de la vérification des tables:" << query.lastError().text();
         return false;
     }
-    qDebug() << "Table créée avec succès";
     
+    if (query.next()) {
+        int tableCount = query.value(0).toInt();
+        qDebug() << "Nombre de tables trouvées:" << tableCount;
+        return tableCount >= 2; // Les deux tables principales existent
+    }
+    
+    return false;
+}
+
+void DatabaseManager::createIndexes()
+{
     // Créer des index et triggers pour l'auto-update
     QStringList indexQueries = {
         "CREATE INDEX IDX_LIVREURS_NOM ON LIVREURS(NOM)",
@@ -222,21 +266,94 @@ bool DatabaseManager::createTables()
     
     for (const QString& indexQuery : indexQueries) {
         QSqlQuery query(database);
-        query.exec(indexQuery);
-        qDebug() << "Index/Trigger créé avec succès";
+        if (!query.exec(indexQuery)) {
+            // Les index existants ne sont pas une erreur
+            QString error = query.lastError().text();
+            if (error.contains("name is already used by an existing object") || 
+                error.contains("ORA-00955")) {
+                qDebug() << "Index existe déjà - OK";
+            } else {
+                qDebug() << "Erreur création index:" << error;
+            }
+        } else {
+            qDebug() << "Index créé avec succès";
+        }
+    }
+}
+
+void DatabaseManager::updateForeignKeyConstraints()
+{
+    qDebug() << "Mise à jour des contraintes de clé étrangère pour CASCADE...";
+    
+    // Vérifier si la contrainte actuelle existe et la supprimer si nécessaire
+    QSqlQuery checkConstraint(database);
+    checkConstraint.exec("SELECT constraint_name FROM user_constraints WHERE table_name = 'COMMANDES' AND constraint_type = 'R'");
+    
+    QStringList constraintsToUpdate;
+    while (checkConstraint.next()) {
+        QString constraintName = checkConstraint.value(0).toString();
+        constraintsToUpdate.append(constraintName);
+        qDebug() << "Contrainte trouvée:" << constraintName;
     }
     
-    // NE PAS insérer des données de test automatiquement - utiliser seulement les vraies données
-    // qDebug() << "Insertion de données de test...";
-    // insertSampleData();
-    // qDebug() << "Données de test insérées avec succès";
+    // Supprimer TOUTES les anciennes contraintes de clé étrangère
+    for (const QString& constraintName : constraintsToUpdate) {
+        QSqlQuery dropConstraint(database);
+        QString dropQuery = QString("ALTER TABLE COMMANDES DROP CONSTRAINT %1").arg(constraintName);
+        if (dropConstraint.exec(dropQuery)) {
+            qDebug() << "Ancienne contrainte supprimée:" << constraintName;
+        } else {
+            qDebug() << "Erreur suppression contrainte:" << dropConstraint.lastError().text();
+        }
+    }
     
-    qDebug() << "Création des tables terminée avec succès";
-    return true;
+    // Ajouter la nouvelle contrainte CASCADE
+    QSqlQuery addConstraint(database);
+    QString addConstraintQuery = R"(
+        ALTER TABLE COMMANDES 
+        ADD CONSTRAINT FK_COMMANDES_LIVREUR_CASCADE 
+        FOREIGN KEY (ID_LIVREUR) REFERENCES LIVREURS(ID_LIVREUR) ON DELETE CASCADE
+    )";
+    
+    if (addConstraint.exec(addConstraintQuery)) {
+        qDebug() << "Nouvelle contrainte CASCADE ajoutée avec succès";
+    } else {
+        QString error = addConstraint.lastError().text();
+        if (error.contains("name is already used by an existing object") || 
+            error.contains("ORA-00955")) {
+            qDebug() << "Contrainte CASCADE existe déjà - OK";
+        } else {
+            qDebug() << "Erreur ajout contrainte CASCADE:" << error;
+            
+            // Si échec, essayer avec un nom différent
+            QSqlQuery addConstraint2(database);
+            QString addConstraintQuery2 = R"(
+                ALTER TABLE COMMANDES 
+                ADD CONSTRAINT FK_COMM_LIVR_CASCADE 
+                FOREIGN KEY (ID_LIVREUR) REFERENCES LIVREURS(ID_LIVREUR) ON DELETE CASCADE
+            )";
+            
+            if (addConstraint2.exec(addConstraintQuery2)) {
+                qDebug() << "Contrainte CASCADE ajoutée avec nom alternatif";
+            } else {
+                qDebug() << "Échec total ajout contrainte CASCADE:" << addConstraint2.lastError().text();
+            }
+        }
+    }
 }
 
 bool DatabaseManager::insertSampleData()
 {
+    // Vérifier d'abord si des données existent déjà
+    QSqlQuery checkQuery(database);
+    checkQuery.exec("SELECT COUNT(*) FROM LIVREURS");
+    if (checkQuery.next() && checkQuery.value(0).toInt() > 0) {
+        qDebug() << "Des données existent déjà dans LIVREURS, pas d'insertion de données de test";
+        return true;
+    }
+    
+    qDebug() << "Insertion de données de test...";
+    
     // Insérer des livreurs de test avec TOUS les champs
     QStringList livreursData = {
         "INSERT INTO LIVREURS (NOM, TELEPHONE, ZONE_LIVRAISON, VEHICULE, DISPONIBILITE) VALUES ('Ahmed Ben Ali', '22123456', 'Tunis Centre', 'Moto Yamaha', 1)",
@@ -275,5 +392,25 @@ bool DatabaseManager::insertSampleData()
         qDebug() << "Commande insérée avec succès";
     }
     
+    qDebug() << "Données de test insérées avec succès";
     return true;
+}
+
+void DatabaseManager::initializeDatabaseWithSampleData()
+{
+    if (isConnected()) {
+        insertSampleData();
+    } else {
+        qDebug() << "Base de données non connectée, impossible d'insérer des données de test";
+    }
+}
+
+void DatabaseManager::forceUpdateConstraints()
+{
+    if (isConnected()) {
+        qDebug() << "Forçage de la mise à jour des contraintes...";
+        updateForeignKeyConstraints();
+    } else {
+        qDebug() << "Base de données non connectée, impossible de mettre à jour les contraintes";
+    }
 }

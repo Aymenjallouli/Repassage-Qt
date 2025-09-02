@@ -530,13 +530,28 @@ void LivreurWidget::supprimerLivreur()
     int idLivreur = tableLivreurs->item(row, 0)->text().toInt();
     QString nomLivreur = tableLivreurs->item(row, 1)->text();
     
-    int reponse = QMessageBox::question(this, "Confirmation",
-        QString("Êtes-vous sûr de vouloir supprimer le livreur '%1'?").arg(nomLivreur),
-        QMessageBox::Yes | QMessageBox::No);
+    // Vérifier le nombre de commandes associées
+    int nbCommandes = livreurService->compterToutesCommandes(idLivreur);
+    
+    QString message = QString("Êtes-vous sûr de vouloir supprimer le livreur '%1'?").arg(nomLivreur);
+    
+    if (nbCommandes > 0) {
+        message += QString("\n\n⚠️ ATTENTION: Cette action supprimera également %1 commande(s) associée(s) "
+                          "de façon définitive (suppression en cascade).").arg(nbCommandes);
+    }
+    
+    int reponse = QMessageBox::question(this, "Confirmation de suppression",
+        message,
+        QMessageBox::Yes | QMessageBox::No,
+        QMessageBox::No); // Par défaut sur "Non" pour plus de sécurité
     
     if (reponse == QMessageBox::Yes) {
         if (livreurService->supprimerLivreur(idLivreur)) {
-            QMessageBox::information(this, "Succès", "Livreur supprimé avec succès!");
+            QString successMsg = "Livreur supprimé avec succès!";
+            if (nbCommandes > 0) {
+                successMsg += QString("\n%1 commande(s) associée(s) ont également été supprimée(s).").arg(nbCommandes);
+            }
+            QMessageBox::information(this, "Succès", successMsg);
             actualiserListe();
         } else {
             QMessageBox::warning(this, "Erreur", "Impossible de supprimer le livreur!");

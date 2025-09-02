@@ -27,7 +27,8 @@ private slots:
     void quitterApplication();
     void actualiserDonnees();
     void exporterDonnees();
-
+    void mettreAJourContraintes(); // Nouvelle méthode
+    
 private:
     void setupUI();
     void setupMenus();
@@ -50,6 +51,7 @@ private:
     QAction* actionAPropos;
     QAction* actionActualiser;
     QAction* actionExporter;
+    QAction* actionMettreAJourContraintes; // Nouvelle action
 };
 
 #endif // MAINWINDOW_H

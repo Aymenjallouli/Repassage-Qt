@@ -81,6 +81,15 @@ void MainWindow::setupMenus()
     menuFichier->addSeparator();
     menuFichier->addAction(actionQuitter);
     
+    // Menu Base de données
+    QMenu* menuBaseDonnees = mainMenuBar->addMenu("&Base de données");
+    
+    actionMettreAJourContraintes = new QAction("Mettre à jour les &contraintes CASCADE", this);
+    actionMettreAJourContraintes->setToolTip("Force la mise à jour des contraintes de clé étrangère pour permettre la suppression en cascade");
+    actionMettreAJourContraintes->setIcon(QIcon::fromTheme("database"));
+    
+    menuBaseDonnees->addAction(actionMettreAJourContraintes);
+    
     // Menu Aide
     QMenu* menuAide = mainMenuBar->addMenu("&Aide");
     
@@ -117,6 +126,7 @@ void MainWindow::connecterSignaux()
     connect(actionAPropos, &QAction::triggered, this, &MainWindow::afficherAPropos);
     connect(actionActualiser, &QAction::triggered, this, &MainWindow::actualiserDonnees);
     connect(actionExporter, &QAction::triggered, this, &MainWindow::exporterDonnees);
+    connect(actionMettreAJourContraintes, &QAction::triggered, this, &MainWindow::mettreAJourContraintes);
 }
 
 void MainWindow::afficherAPropos()
@@ -201,6 +211,36 @@ void MainWindow::exporterDonnees()
             statusLabel->setText("Erreur lors de l'export");
             QMessageBox::warning(this, "Erreur d'export", 
                 "Une erreur s'est produite lors de l'export des données.");
+        }
+    }
+}
+
+void MainWindow::mettreAJourContraintes()
+{
+    int reponse = QMessageBox::question(this, "Mise à jour des contraintes",
+        "Cette opération va mettre à jour les contraintes de la base de données "
+        "pour permettre la suppression en cascade.\n\n"
+        "⚠️ ATTENTION: Cette opération modifie la structure de la base de données.\n\n"
+        "Voulez-vous continuer?",
+        QMessageBox::Yes | QMessageBox::No,
+        QMessageBox::No);
+    
+    if (reponse == QMessageBox::Yes) {
+        DatabaseManager* db = DatabaseManager::getInstance();
+        
+        if (db->isConnected()) {
+            statusLabel->setText("Mise à jour des contraintes en cours...");
+            
+            db->forceUpdateConstraints();
+            
+            statusLabel->setText("Contraintes mises à jour avec succès");
+            QMessageBox::information(this, "Succès", 
+                "Les contraintes de la base de données ont été mises à jour.\n"
+                "La suppression en cascade est maintenant active.");
+        } else {
+            QMessageBox::warning(this, "Erreur", 
+                "Impossible de mettre à jour les contraintes: base de données non connectée.");
+            statusLabel->setText("Erreur: Base de données non connectée");
         }
     }
 }

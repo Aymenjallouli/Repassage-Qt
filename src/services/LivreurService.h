@@ -46,7 +46,8 @@ public:
     
     // Méthodes utilitaires publiques
     int compterCommandesActives(int idLivreur);
-
+    int compterToutesCommandes(int idLivreur); // Nouvelle méthode pour toutes les commandes
+    
 private:
     Livreur mapFromQuery(const QSqlQuery& query);
     int obtenirProchainId();
